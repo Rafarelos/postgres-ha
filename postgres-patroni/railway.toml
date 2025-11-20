@@ -1,11 +1,9 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "postgres-patroni/Dockerfile"
+watchPatterns = ["postgres-patroni/**"]
 
 [deploy]
-startCommand = "patroni /etc/patroni/patroni.yml"
-healthcheckPath = "/health"
-healthcheckTimeout = 10
 restartPolicyType = "always"
 restartPolicyMaxRetries = 10
 numReplicas = 1

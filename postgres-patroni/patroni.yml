@@ -1,5 +1,4 @@
 scope: ${PATRONI_SCOPE}
-namespace: /service/
 name: ${PATRONI_NAME}
 
 restapi:
@@ -11,8 +10,8 @@ etcd:
 
 bootstrap:
   dcs:
-    ttl: ${PATRONI_TTL:-30}
-    loop_wait: ${PATRONI_LOOP_WAIT:-10}
+    ttl: ${PATRONI_TTL}
+    loop_wait: ${PATRONI_LOOP_WAIT}
     retry_timeout: 10
     maximum_lag_on_failover: 1048576
     postgresql:

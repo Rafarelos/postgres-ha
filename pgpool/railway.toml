@@ -1,10 +1,8 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "pgpool/Dockerfile"
+watchPatterns = ["pgpool/**"]
 
 [deploy]
-startCommand = "pgpool -n -f /etc/pgpool-II/pgpool.conf -F /etc/pgpool-II/pcp.conf"
-healthcheckPath = ""
-healthcheckTimeout = 10
 restartPolicyType = "always"
 numReplicas = 3
