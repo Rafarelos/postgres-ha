@@ -4,14 +4,18 @@ USER root
 
 # Force rebuild
 
-# Install jq for patroni-watcher
-RUN apt-get update && apt-get install -y jq && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install Python and dependencies for patroni-watcher
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-requests \
+    netcat-openbsd \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Don't copy custom config - let Bitnami generate from env vars
 COPY pool_hba.conf /opt/bitnami/pgpool/conf/pool_hba.conf
-COPY patroni-watcher.sh /usr/local/bin/patroni-watcher.sh
-RUN chmod +x /usr/local/bin/patroni-watcher.sh
+COPY patroni-watcher.py /usr/local/bin/patroni-watcher.py
+RUN chmod +x /usr/local/bin/patroni-watcher.py
 
 # Create wrapper entrypoint to fix missing env var and start watcher
 COPY <<'EOF' /entrypoint-wrapper.sh
@@ -26,7 +30,7 @@ if [ -z "${PGPOOL_HEALTH_CHECK_PASSWORD}" ] && [ -n "${PGPOOL_POSTGRES_PASSWORD}
 fi
 
 # Start patroni-watcher in background (it will wait for pgpool to be ready)
-/usr/local/bin/patroni-watcher.sh &
+python3 /usr/local/bin/patroni-watcher.py &
 WATCHER_PID=$!
 
 # Trap to kill watcher on exit
