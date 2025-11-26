@@ -5,4 +5,4 @@ watchPatterns = ["pgpool/**"]
 
 [deploy]
 restartPolicyType = "always"
-numReplicas = 3
+multiRegionConfig = { "us-east4-eqdc4a" = { numReplicas = 3 } }
