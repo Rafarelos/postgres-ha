@@ -35,8 +35,28 @@ run_pcp_command() {
 get_patroni_role() {
     local host="$1"
     local role
+    local response
+    local curl_exit
 
-    role=$(curl -sf "http://${host}:8008/patroni" 2>/dev/null | jq -r '.role // empty' 2>/dev/null || echo "")
+    # Try to fetch from Patroni API with error capture
+    response=$(curl -sf "http://${host}:8008/patroni" 2>&1)
+    curl_exit=$?
+
+    if [ $curl_exit -ne 0 ]; then
+        log "DEBUG: curl to ${host}:8008/patroni failed with exit code $curl_exit: $response"
+        echo ""
+        return
+    fi
+
+    # Try to parse JSON
+    role=$(echo "$response" | jq -r '.role // empty' 2>&1)
+    if [ $? -ne 0 ] || [ -z "$role" ]; then
+        log "DEBUG: Failed to parse role from ${host}. Response: $response"
+        echo ""
+        return
+    fi
+
+    log "DEBUG: ${host} role is '$role'"
     echo "$role"
 }
 
@@ -108,6 +128,7 @@ main() {
     last_leader=""
 
     while true; do
+        log "DEBUG: Polling cluster for leader..."
         current_leader=$(get_cluster_leader)
 
         if [ -z "$current_leader" ]; then
@@ -116,6 +137,8 @@ main() {
             log "Leader change detected: ${last_leader:-none} -> $current_leader"
             sync_pgpool_with_patroni "$current_leader"
             last_leader="$current_leader"
+        else
+            log "DEBUG: Leader unchanged: $current_leader"
         fi
 
         sleep "$POLL_INTERVAL"
