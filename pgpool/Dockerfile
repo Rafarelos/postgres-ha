@@ -2,11 +2,11 @@ FROM railwayapp/pgpool:4
 
 USER root
 
-# Force rebuild 2025-11-27-01-16
+# Force rebuild 2025-11-27-01-23
 
 # Disable pgpool health checks AND sr_check - let patroni-watcher control backends
 ENV PGPOOL_ENABLE_HEALTH_CHECK=no
-ENV PGPOOL_ENABLE_POOL_HBA=on
+ENV PGPOOL_ENABLE_POOL_HBA=yes
 ENV PGPOOL_SR_CHECK_PERIOD=0
 
 # Install Python and dependencies for patroni-watcher
