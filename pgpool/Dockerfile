@@ -35,6 +35,11 @@ echo "[custom-run] Starting Bitnami pgpool initialization..." >&2
 . /opt/bitnami/scripts/libpgpool.sh
 . /opt/bitnami/scripts/libos.sh
 
+# Debug environment before Bitnami setup
+echo "[custom-run] DEBUG: PGPOOL_ADMIN_PASSWORD length: ${#PGPOOL_ADMIN_PASSWORD}" >&2
+echo "[custom-run] DEBUG: PGPOOL_ADMIN_PASSWORD first 8 chars: ${PGPOOL_ADMIN_PASSWORD:0:8}..." >&2
+echo "[custom-run] DEBUG: PGPOOL_ADMIN_USERNAME: ${PGPOOL_ADMIN_USERNAME}" >&2
+
 # Run Bitnami's initialization (generates configs from env vars)
 echo "[custom-run] Running Bitnami setup..." >&2
 info "** Starting Pgpool-II setup **"
