@@ -78,14 +78,12 @@ fi
 
 # Create our own pcp.conf with hash from PGPOOL_ADMIN_PASSWORD
 # This ensures patroni-watcher and pgpool use the same password
-echo "[custom-run] Creating pcp.conf with pg_md5..." >&2
+echo "[custom-run] Creating pcp.conf..." >&2
 mkdir -p /opt/bitnami/pgpool/conf
 
 USERNAME="${PGPOOL_ADMIN_USERNAME:-admin}"
-# Use pgpool's pg_md5 utility to generate the hash (returns just the hash)
-# -m flag: produce md5 authentication password
-# -u flag: append username to password before computing hash
-HASH=$(/opt/bitnami/pgpool/bin/pg_md5 -m -u "${USERNAME}" "${PGPOOL_ADMIN_PASSWORD}")
+# Compute MD5 hash of password+username (required format for PCP)
+HASH=$(echo -n "${PGPOOL_ADMIN_PASSWORD}${USERNAME}" | md5sum | cut -d' ' -f1)
 
 # Write pcp.conf in the format: username:md5hash (with md5 prefix)
 echo "${USERNAME}:md5${HASH}" > /opt/bitnami/pgpool/conf/pcp.conf
