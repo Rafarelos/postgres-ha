@@ -40,7 +40,8 @@ def run_pcp_command(cmd: str, *args) -> bool:
     """Execute a PCP command with proper environment and error handling"""
     try:
         env = os.environ.copy()
-        env["PCPPASSWORD"] = PCP_PASSWORD
+        # PCP uses PCPPASSFILE pointing to a password file, not a direct password env var
+        env["PCPPASSFILE"] = "/tmp/.pcppass"
 
         full_cmd = [
             cmd,

@@ -2,8 +2,8 @@ FROM railwayapp/pgpool:4
 
 USER root
 
-# Force rebuild 2025-11-28-v3-md5sum-only
-ARG CACHE_BUST=2025-11-28-14-50
+# Force rebuild 2025-11-28-v4-fix-pcppassfile
+ARG CACHE_BUST=2025-11-28-15-00
 
 # Don't try to use ENV vars to disable health checks - Bitnami ignores them
 # We'll modify pgpool.conf directly before starting pgpool
@@ -101,6 +101,14 @@ chmod 600 /opt/bitnami/pgpool/conf/pcp.conf
 echo "[custom-run] pcp.conf generated successfully" >&2
 echo "[custom-run] DEBUG: pcp.conf contents:" >&2
 cat /opt/bitnami/pgpool/conf/pcp.conf >&2
+
+# Create pcppass file for PCP client authentication
+# Format: hostname:port:username:password
+echo "[custom-run] Creating pcppass file for PCP client auth..." >&2
+echo "localhost:9898:${USERNAME}:${PGPOOL_ADMIN_PASSWORD}" > /tmp/.pcppass
+echo "*:9898:${USERNAME}:${PGPOOL_ADMIN_PASSWORD}" >> /tmp/.pcppass
+chmod 600 /tmp/.pcppass
+echo "[custom-run] pcppass file created" >&2
 
 # Start patroni-watcher in background
 echo "[custom-run] Starting patroni-watcher..." >&2
