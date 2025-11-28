@@ -73,6 +73,10 @@ fi
 
 # Bitnami creates pcp.conf in /etc/ but PCP looks for it in /conf/
 echo "[custom-run] Copying pcp.conf from etc/ to conf/..." >&2
+echo "[custom-run] DEBUG: Contents of pcp.conf before copy:" >&2
+cat /opt/bitnami/pgpool/etc/pcp.conf >&2
+echo "[custom-run] DEBUG: PGPOOL_ADMIN_USERNAME=${PGPOOL_ADMIN_USERNAME}" >&2
+echo "[custom-run] DEBUG: PGPOOL_ADMIN_PASSWORD length: ${#PGPOOL_ADMIN_PASSWORD}" >&2
 cp /opt/bitnami/pgpool/etc/pcp.conf /opt/bitnami/pgpool/conf/pcp.conf
 echo "[custom-run] pcp.conf copied successfully" >&2
 
