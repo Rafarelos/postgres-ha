@@ -71,13 +71,20 @@ else
   exit 1
 fi
 
-# Copy Bitnami's generated pcp.conf to the correct location
-# Bitnami generates it in /etc/ but pgpool looks for it in /conf/
-echo "[custom-run] Copying Bitnami's pcp.conf to /conf/ directory..." >&2
+# Fix Bitnami's pcp.conf by adding "md5" prefix
+# Bitnami generates the hash correctly but doesn't add the md5 prefix
+echo "[custom-run] Fixing pcp.conf format..." >&2
 mkdir -p /opt/bitnami/pgpool/conf
 if [ -f /opt/bitnami/pgpool/etc/pcp.conf ]; then
-  cp /opt/bitnami/pgpool/etc/pcp.conf /opt/bitnami/pgpool/conf/pcp.conf
-  echo "[custom-run] pcp.conf copied successfully" >&2
+  # Read the first line from Bitnami's pcp.conf (format: username:hash)
+  LINE=$(head -n 1 /opt/bitnami/pgpool/etc/pcp.conf)
+  USERNAME=$(echo "$LINE" | cut -d':' -f1)
+  HASH=$(echo "$LINE" | cut -d':' -f2)
+
+  # Write to conf directory with md5 prefix
+  echo "${USERNAME}:md5${HASH}" > /opt/bitnami/pgpool/conf/pcp.conf
+
+  echo "[custom-run] pcp.conf fixed successfully" >&2
   echo "[custom-run] DEBUG: pcp.conf contents:" >&2
   cat /opt/bitnami/pgpool/conf/pcp.conf >&2
 else
