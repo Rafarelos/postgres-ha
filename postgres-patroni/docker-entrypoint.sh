@@ -26,17 +26,46 @@ if [ "$NAME" = "postgres-1" ] || [ "$NAME" = "${PATRONI_SCOPE}-1" ]; then
     IS_PRIMARY=true
 fi
 
-# Check if we need to adopt existing standalone data
+# Check if we need to adopt existing standalone data or reinitialize
 ADOPTING_EXISTING=false
+FORCE_REINIT="${PATRONI_FORCE_REINIT:-false}"
+
 if [ -f "$DATA_DIR/PG_VERSION" ]; then
     if [ "$IS_PRIMARY" = "true" ]; then
         echo "Existing PostgreSQL data found on primary"
 
-        # Check if this data was created by Patroni (has patroni.dynamic.json)
-        if [ ! -f "$DATA_DIR/patroni.dynamic.json" ]; then
+        # Check if etcd has mismatched state by querying for initialize key
+        ETCD_HAS_STATE=false
+        for endpoint in $(echo $ETCD_HOSTS | tr ',' ' '); do
+            INIT_RESPONSE=$(curl -s "http://$endpoint/v2/keys/service/$SCOPE/initialize" 2>/dev/null || echo "")
+            if echo "$INIT_RESPONSE" | grep -q '"value"'; then
+                ETCD_HAS_STATE=true
+                echo "etcd has existing cluster state"
+            fi
+            break
+        done
+
+        # Force reinit if requested OR if this looks like standalone data OR etcd has mismatched state
+        if [ "$FORCE_REINIT" = "true" ]; then
+            echo "PATRONI_FORCE_REINIT=true - forcing cluster reinitialization"
+            ADOPTING_EXISTING=true
+        elif [ ! -f "$DATA_DIR/patroni.dynamic.json" ]; then
             echo "Data appears to be from standalone PostgreSQL - preparing for adoption"
             ADOPTING_EXISTING=true
+        elif [ "$ETCD_HAS_STATE" = "true" ]; then
+            # patroni.dynamic.json exists but etcd might have stale state from failed attempt
+            echo "Patroni data exists but checking etcd consistency..."
+            # Try to get the system identifier from pg_control
+            if command -v pg_controldata &> /dev/null; then
+                LOCAL_SYSID=$(pg_controldata "$DATA_DIR" 2>/dev/null | grep "Database system identifier" | awk '{print $NF}')
+                echo "Local system ID: $LOCAL_SYSID"
+            fi
+            # If we can't verify, assume we need to clear
+            echo "Clearing potentially stale etcd state to be safe"
+            ADOPTING_EXISTING=true
+        fi
 
+        if [ "$ADOPTING_EXISTING" = "true" ]; then
             # Clear ALL cluster state from etcd to allow fresh adoption
             echo "Clearing etcd cluster state for fresh adoption..."
             for endpoint in $(echo $ETCD_HOSTS | tr ',' ' '); do
