@@ -65,6 +65,24 @@ EOF
 # Generate SSL certs
 generate_ssl_certs
 
+# Check for required password on fresh installs
+if [ ! -f "$DATA_DIR/PG_VERSION" ] && [ -z "$POSTGRES_PASSWORD" ]; then
+    echo ""
+    echo "ERROR: POSTGRES_PASSWORD is required for new database initialization."
+    echo ""
+    echo "Set the following environment variables:"
+    echo "  POSTGRES_PASSWORD=<secure_password>  (required)"
+    echo "  POSTGRES_USER=<username>             (optional, default: postgres)"
+    echo "  POSTGRES_DB=<database>               (optional, default: postgres)"
+    echo ""
+    echo "For HA mode, also set:"
+    echo "  PATRONI_ENABLED=true"
+    echo "  PATRONI_NAME=postgres-1"
+    echo "  PATRONI_REPLICATION_PASSWORD=<password>"
+    echo ""
+    exit 1
+fi
+
 # Route based on PATRONI_ENABLED
 if [ "${PATRONI_ENABLED:-false}" = "true" ]; then
     echo "=== Patroni mode enabled ==="

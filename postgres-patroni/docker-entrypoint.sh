@@ -20,23 +20,71 @@ SUPERUSER_PASS="${PATRONI_SUPERUSER_PASSWORD:-${POSTGRES_PASSWORD:-postgres}}"
 REPL_USER="${PATRONI_REPLICATION_USERNAME:-replicator}"
 REPL_PASS="${PATRONI_REPLICATION_PASSWORD:-replicator_password}"
 
-# Clear stale initialization key from etcd (prevents bootstrap deadlock)
-echo "Clearing stale etcd initialization keys..."
-for endpoint in $(echo $ETCD_HOSTS | tr ',' ' '); do
-    curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/initialize" 2>/dev/null || true
-    break
-done
-
 # Determine if this is the primary (first node) or a replica
 IS_PRIMARY=false
 if [ "$NAME" = "postgres-1" ] || [ "$NAME" = "${PATRONI_SCOPE}-1" ]; then
     IS_PRIMARY=true
 fi
 
-# Handle existing data directory
+# Check if we need to adopt existing standalone data
+ADOPTING_EXISTING=false
 if [ -f "$DATA_DIR/PG_VERSION" ]; then
     if [ "$IS_PRIMARY" = "true" ]; then
-        echo "Existing PostgreSQL data found - Patroni will adopt it as leader"
+        echo "Existing PostgreSQL data found on primary"
+
+        # Check if this data was created by Patroni (has patroni.dynamic.json)
+        if [ ! -f "$DATA_DIR/patroni.dynamic.json" ]; then
+            echo "Data appears to be from standalone PostgreSQL - preparing for adoption"
+            ADOPTING_EXISTING=true
+
+            # Clear ALL cluster state from etcd to allow fresh adoption
+            echo "Clearing etcd cluster state for fresh adoption..."
+            for endpoint in $(echo $ETCD_HOSTS | tr ',' ' '); do
+                echo "  Clearing $endpoint..."
+                # Delete the entire scope directory recursively
+                curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE?recursive=true" 2>/dev/null || true
+                # Also try v3 API format
+                curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/initialize" 2>/dev/null || true
+                curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/leader" 2>/dev/null || true
+                curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/members" 2>/dev/null || true
+                break
+            done
+            echo "etcd cluster state cleared"
+
+            # Ensure replication settings are in postgresql.conf for adoption
+            echo "Configuring PostgreSQL for replication..."
+            PG_CONF="$DATA_DIR/postgresql.conf"
+            if [ -f "$PG_CONF" ]; then
+                # Add/update replication settings
+                grep -q "^wal_level" "$PG_CONF" || echo "wal_level = replica" >> "$PG_CONF"
+                grep -q "^max_wal_senders" "$PG_CONF" || echo "max_wal_senders = 10" >> "$PG_CONF"
+                grep -q "^max_replication_slots" "$PG_CONF" || echo "max_replication_slots = 10" >> "$PG_CONF"
+                grep -q "^hot_standby" "$PG_CONF" || echo "hot_standby = on" >> "$PG_CONF"
+                grep -q "^wal_keep_size" "$PG_CONF" || echo "wal_keep_size = 128MB" >> "$PG_CONF"
+            fi
+
+            # Create a script to run after postgres starts to create replicator user
+            cat > /tmp/setup_replication.sh <<REPLEOF
+#!/bin/bash
+sleep 10  # Wait for postgres to be ready
+for i in {1..30}; do
+    if pg_isready -U postgres; then
+        echo "Creating replication user..."
+        psql -U postgres -c "DO \\\$\\\$
+        BEGIN
+            IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${REPL_USER}') THEN
+                CREATE ROLE ${REPL_USER} WITH REPLICATION PASSWORD '${REPL_PASS}' LOGIN;
+            END IF;
+        END
+        \\\$\\\$;" && break
+    fi
+    sleep 2
+done
+REPLEOF
+            chmod +x /tmp/setup_replication.sh
+        else
+            echo "Data was created by Patroni - normal startup"
+        fi
     else
         echo "Existing data found on replica node - cleaning for fresh clone..."
         # Keep certs directory
@@ -45,6 +93,13 @@ if [ -f "$DATA_DIR/PG_VERSION" ]; then
     fi
 else
     echo "No existing data - Patroni will initialize (primary) or clone (replica)"
+
+    # Clear stale initialization key (prevents bootstrap deadlock on fresh start)
+    echo "Clearing stale etcd initialization keys..."
+    for endpoint in $(echo $ETCD_HOSTS | tr ',' ' '); do
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/initialize" 2>/dev/null || true
+        break
+    done
 fi
 
 # Write credentials and settings for post_bootstrap script
@@ -155,6 +210,12 @@ cleanup() {
 
 # Trap signals and unexpected exits
 trap cleanup EXIT SIGTERM SIGINT SIGQUIT
+
+# Run replication setup in background if adopting existing data
+if [ "$ADOPTING_EXISTING" = "true" ] && [ -f /tmp/setup_replication.sh ]; then
+    echo "Starting replication setup in background..."
+    /tmp/setup_replication.sh &
+fi
 
 # Start Patroni (not exec, so trap works)
 patroni /tmp/patroni.yml &
