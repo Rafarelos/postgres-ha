@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd etcd-2
+cd etcd
 
 echo "Creating etcd-2 service..."
 railway service create etcd-2 2>/dev/null || echo "Service etcd-2 already exists"
