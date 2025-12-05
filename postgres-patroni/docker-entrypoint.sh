@@ -9,6 +9,15 @@ CERTS_DIR="$DATA_DIR/certs"
 
 echo "=== Patroni Entrypoint ==="
 
+# Check for data in old pgdata subdirectory location and migrate if needed
+if [ -f "$DATA_DIR/pgdata/PG_VERSION" ] && [ ! -f "$DATA_DIR/PG_VERSION" ]; then
+    echo "Found data in old pgdata/ subdirectory, migrating to new location..."
+    # Move everything from pgdata up one level (except certs if exists)
+    mv "$DATA_DIR/pgdata"/* "$DATA_DIR/" 2>/dev/null || true
+    rmdir "$DATA_DIR/pgdata" 2>/dev/null || true
+    echo "Data migration complete"
+fi
+
 # Configuration from environment
 SCOPE="${PATRONI_SCOPE:-railway-pg-ha}"
 NAME="${PATRONI_NAME:-postgres-1}"
@@ -123,12 +132,23 @@ REPLEOF
 else
     echo "No existing data - Patroni will initialize (primary) or clone (replica)"
 
-    # Clear stale initialization key (prevents bootstrap deadlock on fresh start)
-    echo "Clearing stale etcd initialization keys..."
+    # Clear ALL stale etcd state (prevents system ID mismatch issues)
+    echo "Clearing ALL stale etcd cluster state..."
     for endpoint in $(echo $ETCD_HOSTS | tr ',' ' '); do
+        echo "  Clearing $endpoint..."
+        # Delete the entire scope directory recursively
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE?recursive=true" 2>/dev/null || true
         curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/initialize" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/leader" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/members" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/config" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/history" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/status" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/sync" 2>/dev/null || true
+        curl -s -X DELETE "http://$endpoint/v2/keys/service/$SCOPE/failover" 2>/dev/null || true
         break
     done
+    echo "etcd cluster state cleared"
 fi
 
 # Write credentials and settings for post_bootstrap script
