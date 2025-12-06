@@ -27,18 +27,27 @@ echo "Node: $NAME (primary: $IS_PRIMARY)"
 
 # Check for valid PostgreSQL data
 HAS_VALID_DATA=false
-[ -f "$DATA_DIR/global/pg_control" ] && HAS_VALID_DATA=true
+if [ -f "$DATA_DIR/global/pg_control" ]; then
+    HAS_VALID_DATA=true
+    echo "Found valid pg_control"
+else
+    echo "No valid pg_control found"
+    echo "Data dir contents:"
+    ls -la "$DATA_DIR" 2>/dev/null || echo "(empty or doesn't exist)"
+fi
 
 # Clean stale data for fresh bootstrap/clone
 if [ "$HAS_VALID_DATA" = "false" ]; then
-    echo "Cleaning data directory for fresh ${IS_PRIMARY:+bootstrap}${IS_PRIMARY:-clone}..."
+    echo "Cleaning data directory..."
     find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name 'certs' -exec rm -rf {} +
+    echo "Data dir after cleanup:"
+    ls -la "$DATA_DIR"
 
-    # Primary clears etcd state
-    if [ "$IS_PRIMARY" = "true" ]; then
-        FIRST_ETCD="${ETCD_HOSTS%%,*}"
+    # Clear etcd state (use v3 API)
+    FIRST_ETCD="${ETCD_HOSTS%%,*}"
+    echo "Clearing etcd state at $FIRST_ETCD for scope $SCOPE..."
+    etcdctl --endpoints="http://$FIRST_ETCD" del "/service/$SCOPE" --prefix 2>/dev/null || \
         curl -s -X DELETE "http://$FIRST_ETCD/v2/keys/service/$SCOPE?recursive=true" 2>/dev/null || true
-    fi
 fi
 
 # Generate Patroni configuration
