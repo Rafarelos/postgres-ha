@@ -3,8 +3,11 @@ set -e
 
 # Patroni mode entrypoint (only runs when PATRONI_ENABLED=true)
 
-DATA_DIR="/var/lib/postgresql/data"
-CERTS_DIR="$DATA_DIR/certs"
+MOUNT_DIR="/var/lib/postgresql/data"
+DATA_DIR="$MOUNT_DIR/pgdata"
+CERTS_DIR="$MOUNT_DIR/certs"
+
+mkdir -p "$DATA_DIR"
 
 echo "=== Patroni Entrypoint ==="
 
@@ -39,7 +42,7 @@ fi
 # Clean stale data for fresh bootstrap/clone
 if [ "$HAS_VALID_DATA" = "false" ]; then
     echo "Cleaning data directory..."
-    find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name 'certs' -exec rm -rf {} +
+    find "$DATA_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     echo "Data dir after cleanup:"
     ls -la "$DATA_DIR"
 
@@ -96,6 +99,8 @@ postgresql:
   connect_address: ${NAME}.railway.internal:5432
   data_dir: ${DATA_DIR}
   pgpass: /tmp/pgpass
+  remove_data_directory_on_rewind_failure: true
+  remove_data_directory_on_diverged_timelines: true
   authentication:
     replication:
       username: ${REPL_USER}
