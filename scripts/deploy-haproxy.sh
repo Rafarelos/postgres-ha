@@ -6,7 +6,7 @@ railway service create haproxy 2>/dev/null || echo "Service haproxy already exis
 
 echo "Setting haproxy variables..."
 # Format: hostname:pgport:patroniport,hostname:pgport:patroniport,...
-railway variables --service haproxy --set 'POSTGRES_NODES=${{postgres-1.RAILWAY_PRIVATE_DOMAIN}}:5432:8008,${{postgres-2.RAILWAY_PRIVATE_DOMAIN}}:5432:8008,${{postgres-3.RAILWAY_PRIVATE_DOMAIN}}:5432:8008'
+railway variables --service haproxy --set 'POSTGRES_NODES=${{postgres-1.PGHOST}}:${{postgres-1.PGPORT}}:${{postgres-1.PATRONI_API_PORT}},${{postgres-2.PGHOST}}:${{postgres-2.PGPORT}}:${{postgres-2.PATRONI_API_PORT}},${{postgres-3.PGHOST}}:${{postgres-3.PGPORT}}:${{postgres-3.PATRONI_API_PORT}}'
 railway variables --service haproxy --set 'HAPROXY_MAX_CONN=1000'
 railway variables --service haproxy --set 'HAPROXY_CHECK_INTERVAL=3s'
 

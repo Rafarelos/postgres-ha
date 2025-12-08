@@ -50,4 +50,6 @@ HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=2 \
         fi
 
 ENTRYPOINT ["wrapper.sh"]
-CMD ["postgres"]
+# Match postgres-ssl CMD exactly for binary compatibility
+# When PATRONI_ENABLED=true, wrapper.sh ignores these args and runs supervisord
+CMD ["postgres", "-p", "5432", "-c", "listen_addresses=*"]
