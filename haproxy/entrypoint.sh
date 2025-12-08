@@ -7,6 +7,7 @@ CONFIG_FILE="/usr/local/etc/haproxy/haproxy.cfg"
 if [ -z "${POSTGRES_NODES}" ]; then
     echo "ERROR: POSTGRES_NODES is required"
     echo "Format: hostname:pgport:patroniport,hostname:pgport:patroniport,..."
+    echo "Example: postgres-1.railway.internal:5432:8008,postgres-2.railway.internal:5432:8008"
     exit 1
 fi
 
@@ -20,17 +21,29 @@ HAPROXY_CHECK_INTERVAL="${HAPROXY_CHECK_INTERVAL:-3s}"
 # Generate server entries from POSTGRES_NODES
 # Format: hostname:pgport:patroniport,hostname:pgport:patroniport,...
 generate_servers() {
-    local backend_name="$1"
-    local i=0
     echo "$POSTGRES_NODES" | tr ',' '\n' | while read -r node; do
-        host=$(echo "$node" | cut -d: -f1)
-        pgport=$(echo "$node" | cut -d: -f2)
-        patroniport=$(echo "$node" | cut -d: -f3)
+        # Count colons to detect format
+        colon_count=$(echo "$node" | tr -cd ':' | wc -c)
+
+        if [ "$colon_count" -eq 2 ]; then
+            # Format: hostname:pgport:patroniport
+            host=$(echo "$node" | cut -d: -f1)
+            pgport=$(echo "$node" | cut -d: -f2)
+            patroniport=$(echo "$node" | cut -d: -f3)
+        else
+            echo "ERROR: Invalid node format: $node" >&2
+            echo "Expected: hostname:pgport:patroniport" >&2
+            exit 1
+        fi
+
+        # Extract short name from hostname (e.g., postgres-1 from postgres-1.railway.internal)
         name=$(echo "$host" | cut -d. -f1)
         echo "    server ${name} ${host}:${pgport} check port ${patroniport}"
-        i=$((i + 1))
     done
 }
+
+PRIMARY_SERVERS=$(generate_servers)
+REPLICA_SERVERS=$(generate_servers)
 
 # Generate HAProxy config
 cat > "$CONFIG_FILE" << EOF
@@ -76,7 +89,7 @@ backend postgresql_primary_backend
     option httpchk GET /primary
     http-check expect status 200
     default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions resolvers railway init-addr none
-$(generate_servers primary)
+${PRIMARY_SERVERS}
 
 # Replica PostgreSQL (read-only)
 frontend postgresql_replicas
@@ -88,10 +101,12 @@ backend postgresql_replicas_backend
     option httpchk GET /replica
     http-check expect status 200
     default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions resolvers railway init-addr none
-$(generate_servers replica)
+${REPLICA_SERVERS}
 EOF
 
 echo "HAProxy config generated with nodes: ${POSTGRES_NODES}"
+cat "$CONFIG_FILE"
+echo ""
 echo "Starting HAProxy..."
 
 exec haproxy -f "$CONFIG_FILE"
