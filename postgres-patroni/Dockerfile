@@ -59,8 +59,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip3 install --no-cache-dir --break-system-packages setuptools
 
 # Install Patroni and dependencies (etcd3 for v3 API)
+# Note: python-etcd is required due to Patroni 4.0.5 import bug (GitHub #3337)
+# The etcd3 module imports from etcd module even when using v3 API
 RUN pip3 install --no-cache-dir --break-system-packages \
     psycopg2-binary \
+    python-etcd==0.4.5 \
     patroni[etcd3]==${PATRONI_VERSION}
 
 # Create required directories
