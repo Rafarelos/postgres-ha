@@ -12,8 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install setuptools first (required for ydiff dependency)
+# psycopg2-binary is required by Patroni to connect to PostgreSQL
 RUN pip3 install --no-cache-dir --break-system-packages setuptools \
     && pip3 install --no-cache-dir --break-system-packages \
+    psycopg2-binary \
     patroni[etcd]==${PATRONI_VERSION}
 
 # Allow the postgres user to execute certain commands as root without a password
