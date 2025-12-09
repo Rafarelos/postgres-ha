@@ -58,10 +58,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install setuptools first (needed for ydiff's legacy setup.py)
 RUN pip3 install --no-cache-dir --break-system-packages setuptools
 
-# Install Patroni and dependencies
+# Install Patroni and dependencies (etcd3 for v3 API)
 RUN pip3 install --no-cache-dir --break-system-packages \
     psycopg2-binary \
-    patroni[etcd]==${PATRONI_VERSION}
+    patroni[etcd3]==${PATRONI_VERSION}
 
 # Create required directories
 RUN mkdir -p /home/postgres /var/run/postgresql \
