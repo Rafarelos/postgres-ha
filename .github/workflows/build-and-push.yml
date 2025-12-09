@@ -1,0 +1,215 @@
+name: Build and Push Docker Images
+
+on:
+  # Run weekly on Mondays at midnight UTC
+  schedule:
+    - cron: '0 0 * * 1'
+  # Allow manual trigger
+  workflow_dispatch:
+  # Build on push to main (for testing)
+  push:
+    branches:
+      - main
+    paths:
+      - 'postgres-patroni/**'
+      - '.github/workflows/build-and-push.yml'
+
+env:
+  REGISTRY: ghcr.io
+  # Which major version gets the "latest" tag
+  LATEST_POSTGRES_MAJOR: 17
+
+jobs:
+  build-postgres-patroni:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        postgres_major: [13, 14, 15, 16, 17]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get PostgreSQL minor version
+        id: pg_version
+        run: |
+          cd postgres-patroni
+          chmod +x get-postgres-version.sh
+          MINOR_VERSION=$(./get-postgres-version.sh ${{ matrix.postgres_major }})
+          echo "minor_version=${MINOR_VERSION}" >> $GITHUB_OUTPUT
+          echo "Building PostgreSQL ${MINOR_VERSION}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./postgres-patroni
+          file: ./postgres-patroni/Dockerfile.${{ matrix.postgres_major }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni:${{ matrix.postgres_major }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni:${{ steps.pg_version.outputs.minor_version }}
+            ${{ matrix.postgres_major == env.LATEST_POSTGRES_MAJOR && format('{0}/{1}/postgres-patroni:latest', env.REGISTRY, github.repository) || '' }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build other components (etcd, haproxy, pgbouncer, pgpool)
+  build-etcd:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push etcd
+        uses: docker/build-push-action@v5
+        with:
+          context: ./etcd
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/etcd:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-haproxy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push haproxy
+        uses: docker/build-push-action@v5
+        with:
+          context: ./haproxy
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/haproxy:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-pgbouncer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push pgbouncer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./pgbouncer
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/pgbouncer:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-pgpool:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push pgpool
+        uses: docker/build-push-action@v5
+        with:
+          context: ./pgpool
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/pgpool:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

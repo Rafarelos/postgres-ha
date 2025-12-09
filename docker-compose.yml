@@ -71,7 +71,9 @@ services:
       - etcd-3-data:/etcd-data
 
   postgres-1:
-    build: ./postgres-patroni
+    build:
+      context: ./postgres-patroni
+      dockerfile: Dockerfile.${POSTGRES_VERSION:-17}
     container_name: postgres-1
     networks:
       - postgres-ha
@@ -93,7 +95,9 @@ services:
       - etcd-3
 
   postgres-2:
-    build: ./postgres-patroni
+    build:
+      context: ./postgres-patroni
+      dockerfile: Dockerfile.${POSTGRES_VERSION:-17}
     container_name: postgres-2
     networks:
       - postgres-ha
@@ -115,7 +119,9 @@ services:
       - etcd-3
 
   postgres-3:
-    build: ./postgres-patroni
+    build:
+      context: ./postgres-patroni
+      dockerfile: Dockerfile.${POSTGRES_VERSION:-17}
     container_name: postgres-3
     networks:
       - postgres-ha
