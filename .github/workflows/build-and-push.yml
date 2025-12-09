@@ -6,7 +6,7 @@ on:
     - cron: '0 0 * * 1'
   # Allow manual trigger
   workflow_dispatch:
-  # Build on push to main (for testing)
+  # Build on push to main
   push:
     branches:
       - main
@@ -29,6 +29,7 @@ jobs:
     strategy:
       matrix:
         postgres_major: [13, 14, 15, 16, 17]
+        variant: [slim, ha]
 
     steps:
       - name: Checkout repository
@@ -41,7 +42,7 @@ jobs:
           chmod +x get-postgres-version.sh
           MINOR_VERSION=$(./get-postgres-version.sh ${{ matrix.postgres_major }})
           echo "minor_version=${MINOR_VERSION}" >> $GITHUB_OUTPUT
-          echo "Building PostgreSQL ${MINOR_VERSION}"
+          echo "Building PostgreSQL ${MINOR_VERSION} (${{ matrix.variant }})"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -56,26 +57,44 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni
+      - name: Determine image tags
+        id: tags
+        run: |
+          REPO="${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni"
+          MAJOR="${{ matrix.postgres_major }}"
+          MINOR="${{ steps.pg_version.outputs.minor_version }}"
+          VARIANT="${{ matrix.variant }}"
+
+          if [ "$VARIANT" = "slim" ]; then
+            # Slim variant: :17, :17.2, :latest (no suffix)
+            TAGS="${REPO}:${MAJOR}"
+            TAGS="${TAGS},${REPO}:${MINOR}"
+            if [ "$MAJOR" = "${{ env.LATEST_POSTGRES_MAJOR }}" ]; then
+              TAGS="${TAGS},${REPO}:latest"
+            fi
+          else
+            # HA variant: :17-ha, :17.2-ha, :latest-ha
+            TAGS="${REPO}:${MAJOR}-ha"
+            TAGS="${TAGS},${REPO}:${MINOR}-ha"
+            if [ "$MAJOR" = "${{ env.LATEST_POSTGRES_MAJOR }}" ]; then
+              TAGS="${TAGS},${REPO}:latest-ha"
+            fi
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "Image tags: ${TAGS}"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./postgres-patroni
           file: ./postgres-patroni/Dockerfile.${{ matrix.postgres_major }}
+          target: ${{ matrix.variant }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni:${{ matrix.postgres_major }}
-            ${{ env.REGISTRY }}/${{ github.repository }}/postgres-patroni:${{ steps.pg_version.outputs.minor_version }}
-            ${{ matrix.postgres_major == env.LATEST_POSTGRES_MAJOR && format('{0}/{1}/postgres-patroni:latest', env.REGISTRY, github.repository) || '' }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha,scope=pg${{ matrix.postgres_major }}-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=pg${{ matrix.postgres_major }}-${{ matrix.variant }}
 
   # Build other components (etcd, haproxy, pgbouncer, pgpool)
   build-etcd:
@@ -107,10 +126,9 @@ jobs:
           context: ./etcd
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/etcd:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}/etcd:latest
+          cache-from: type=gha,scope=etcd
+          cache-to: type=gha,mode=max,scope=etcd
 
   build-haproxy:
     runs-on: ubuntu-latest
@@ -141,10 +159,9 @@ jobs:
           context: ./haproxy
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/haproxy:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}/haproxy:latest
+          cache-from: type=gha,scope=haproxy
+          cache-to: type=gha,mode=max,scope=haproxy
 
   build-pgbouncer:
     runs-on: ubuntu-latest
@@ -175,10 +192,9 @@ jobs:
           context: ./pgbouncer
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/pgbouncer:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}/pgbouncer:latest
+          cache-from: type=gha,scope=pgbouncer
+          cache-to: type=gha,mode=max,scope=pgbouncer
 
   build-pgpool:
     runs-on: ubuntu-latest
@@ -209,7 +225,6 @@ jobs:
           context: ./pgpool
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/pgpool:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}/pgpool:latest
+          cache-from: type=gha,scope=pgpool
+          cache-to: type=gha,mode=max,scope=pgpool

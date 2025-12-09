@@ -1,50 +1,82 @@
-ARG POSTGRES_VERSION=17
-FROM postgres:${POSTGRES_VERSION}
+# Multi-stage Dockerfile for PostgreSQL with optional Patroni HA
+#
+# Build variants:
+#   slim (default) - Matches postgres-ssl, ~400MB
+#   ha             - Adds Patroni + supervisord, ~550MB
+#
+# Usage:
+#   docker build --build-arg POSTGRES_VERSION=17 --build-arg BUILD_VARIANT=slim -t postgres:17 .
+#   docker build --build-arg POSTGRES_VERSION=17 --build-arg BUILD_VARIANT=ha -t postgres:17-ha .
 
-ARG PATRONI_VERSION=4.0.4
+ARG POSTGRES_VERSION=17
+ARG BUILD_VARIANT=slim
+
+# ============================================================
+# Base stage: Common to both slim and HA
+# ============================================================
+FROM postgres:${POSTGRES_VERSION} AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Allow postgres user to execute specific commands as root
+RUN echo "postgres ALL=(root) NOPASSWD: /usr/bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/openssl" > /etc/sudoers.d/postgres
+
+# ============================================================
+# Slim stage: Standalone PostgreSQL with SSL (matches postgres-ssl)
+# ============================================================
+FROM base AS slim
+
+COPY --chmod=755 init-ssl.sh /docker-entrypoint-initdb.d/init-ssl.sh
+COPY --chmod=755 wrapper.sh /usr/local/bin/wrapper.sh
+
+EXPOSE 5432
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD pg_isready -U ${POSTGRES_USER:-postgres} || exit 1
+
+ENTRYPOINT ["wrapper.sh"]
+CMD ["postgres", "-p", "5432", "-c", "listen_addresses=*"]
+
+# ============================================================
+# HA stage: Patroni + supervisord for high availability
+# ============================================================
+FROM base AS ha
+
+ARG PATRONI_VERSION=4.0.4
+
+# Install HA dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     curl \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
-# Install setuptools first (required for ydiff dependency)
-# psycopg2-binary is required by Patroni to connect to PostgreSQL
-RUN pip3 install --no-cache-dir --break-system-packages setuptools \
-    && pip3 install --no-cache-dir --break-system-packages \
+# Install Patroni and dependencies
+RUN pip3 install --no-cache-dir --break-system-packages \
+    setuptools \
     psycopg2-binary \
     patroni[etcd]==${PATRONI_VERSION}
 
-# Allow the postgres user to execute certain commands as root without a password
-RUN echo "postgres ALL=(root) NOPASSWD: /usr/bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/openssl" > /etc/sudoers.d/postgres
-
+# Create required directories
 RUN mkdir -p /home/postgres /var/run/postgresql \
     && chown -R postgres:postgres /home/postgres /var/run/postgresql
 
-COPY post_bootstrap.sh /post_bootstrap.sh
-COPY wrapper.sh /usr/local/bin/wrapper.sh
-# Single location for init-ssl.sh - matches postgres-ssl template
-# Auto-runs during initdb (standalone), called by post_bootstrap.sh (Patroni)
+# Copy all scripts
 COPY --chmod=755 init-ssl.sh /docker-entrypoint-initdb.d/init-ssl.sh
-
-# Phase 2: Supervisord and watchdog for split-brain prevention (RFC-007)
+COPY --chmod=755 wrapper.sh /usr/local/bin/wrapper.sh
+COPY --chmod=755 post_bootstrap.sh /post_bootstrap.sh
+COPY --chmod=755 patroni-runner.sh /usr/local/bin/patroni-runner.sh
+COPY --chmod=755 patroni-watchdog.sh /usr/local/bin/patroni-watchdog.sh
+COPY --chmod=755 supervisor-exit-handler.sh /usr/local/bin/supervisor-exit-handler.sh
 COPY supervisord.conf /etc/supervisor/conf.d/patroni.conf
-COPY patroni-runner.sh /usr/local/bin/patroni-runner.sh
-COPY patroni-watchdog.sh /usr/local/bin/patroni-watchdog.sh
-COPY supervisor-exit-handler.sh /usr/local/bin/supervisor-exit-handler.sh
-
-RUN chmod +x /post_bootstrap.sh /usr/local/bin/wrapper.sh \
-    /usr/local/bin/patroni-runner.sh /usr/local/bin/patroni-watchdog.sh \
-    /usr/local/bin/supervisor-exit-handler.sh
 
 EXPOSE 5432 8008
 
-# Aggressive health check for faster split-brain detection (Phase 1)
-# - 5s interval with 2 retries = ~15s max detection time
+# Aggressive health check for faster split-brain detection
 HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=2 \
     CMD if [ "${PATRONI_ENABLED:-false}" = "true" ]; then \
             curl -sf http://localhost:8008/health || exit 1; \
@@ -53,6 +85,4 @@ HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=2 \
         fi
 
 ENTRYPOINT ["wrapper.sh"]
-# Match postgres-ssl CMD exactly for binary compatibility
-# When PATRONI_ENABLED=true, wrapper.sh ignores these args and runs supervisord
 CMD ["postgres", "-p", "5432", "-c", "listen_addresses=*"]

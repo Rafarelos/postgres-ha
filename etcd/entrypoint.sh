@@ -28,7 +28,7 @@ monitor_and_mark_bootstrap() {
     sleep 5
     if check_cluster_health; then
       if [ ! -f "$BOOTSTRAP_COMPLETE_MARKER" ]; then
-        touch "$BOOTSTRAP_COMPLETE_MARKER"
+        echo "1" > "$BOOTSTRAP_COMPLETE_MARKER"
         log "Cluster healthy - bootstrap marked complete"
       fi
     fi
