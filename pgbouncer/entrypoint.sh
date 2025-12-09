@@ -10,8 +10,8 @@ PGBOUNCER_PASSWORD="${PGBOUNCER_PASSWORD:-postgres}"
 
 # Generate MD5 hash in PostgreSQL format
 generate_md5_password() {
-    local user="$1"
-    local pass="$2"
+    user="$1"
+    pass="$2"
     echo "md5$(echo -n "${pass}${user}" | md5sum | cut -d' ' -f1)"
 }
 
@@ -23,8 +23,7 @@ EOF
 
 # Add additional users if specified (comma-separated USER:PASSWORD pairs)
 if [ -n "${PGBOUNCER_EXTRA_USERS}" ]; then
-    IFS=',' read -ra USERS <<< "${PGBOUNCER_EXTRA_USERS}"
-    for user_pass in "${USERS[@]}"; do
+    echo "${PGBOUNCER_EXTRA_USERS}" | tr ',' '\n' | while read -r user_pass; do
         user=$(echo "$user_pass" | cut -d: -f1)
         pass=$(echo "$user_pass" | cut -d: -f2)
         echo "\"${user}\" \"$(generate_md5_password "${user}" "${pass}")\"" >> /etc/pgbouncer/userlist.txt

@@ -10,14 +10,12 @@ COPY --from=tools /bin/chmod /bin/chmod
 COPY --from=tools /lib/ld-musl-*.so.1 /lib/
 COPY --from=tools /lib/libc.musl-*.so.1 /lib/
 
-ENV ETCD_DATA_DIR=/etcd-data/data
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN mkdir -p "$ETCD_DATA_DIR"
+RUN chmod 700 "$ETCD_DATA_DIR"
 
 EXPOSE 2379 2380
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s \
   CMD etcdctl endpoint health || exit 1
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/etcd"]
