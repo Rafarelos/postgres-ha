@@ -145,9 +145,11 @@ if PGPASSWORD="${REPL_PASS}" psql -h 127.0.0.1 -p 5432 -U "${REPL_USER}" -d post
     echo "DEBUG: *** PASSWORD TEST PASSED ***"
 else
     echo "DEBUG: *** PASSWORD TEST FAILED ***"
-    echo "DEBUG: Checking pg_hba.conf for 127.0.0.1..."
-    head -20 "${PGDATA}/pg_hba.conf"
 fi
+
+# Check what Patroni put in pgpass - this is what pg_basebackup actually uses!
+echo "DEBUG: Contents of /tmp/pgpass (what Patroni uses):"
+cat /tmp/pgpass 2>&1 || echo "pgpass not found"
 
 # Generate SSL certificates
 echo "Post-bootstrap: generating SSL certificates..."

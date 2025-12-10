@@ -185,5 +185,9 @@ EOF
 
 echo "Starting Patroni (scope: $SCOPE, etcd: $ETCD_HOSTS)"
 
+# DEBUG: Show the authentication section of the YAML Patroni will read
+echo "DEBUG: Authentication section of /tmp/patroni.yml:"
+grep -A10 "authentication:" /tmp/patroni.yml
+
 # Start Patroni (exec to replace this shell process)
 exec patroni /tmp/patroni.yml
