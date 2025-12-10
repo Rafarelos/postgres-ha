@@ -45,6 +45,7 @@ APP_PASS="${POSTGRES_PASSWORD}"
 
 echo "Node: $NAME (address: $CONNECT_ADDRESS)"
 echo "DEBUG: Using superuser '$SUPERUSER' for replication"
+echo "DEBUG: SUPERUSER_PASS from env: length=${#SUPERUSER_PASS} first4=${SUPERUSER_PASS:0:4} last4=${SUPERUSER_PASS: -4}"
 
 # Bootstrap completion marker (like etcd pattern)
 # pg_control can exist from a failed bootstrap - only trust data if marker exists
