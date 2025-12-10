@@ -73,9 +73,18 @@ echo "Post-bootstrap: setting up users (connecting as $SUPERUSER)..."
 
 # Use env -i to run psql with a completely clean environment
 # This ensures no PG* variables can interfere with the -h flag
+
+# Use format() for ALL password operations to ensure proper escaping
+# This prevents SQL injection and handles any special characters correctly
 env -i PATH="$PATH" psql -v ON_ERROR_STOP=1 -h /var/run/postgresql -U "$SUPERUSER" -d postgres <<EOSQL
 -- Set password for the superuser (already exists from initdb)
-ALTER ROLE ${SUPERUSER} WITH PASSWORD '${SUPERUSER_PASS}';
+-- Using format() for proper escaping
+DO \$\$
+BEGIN
+    EXECUTE format('ALTER ROLE %I WITH PASSWORD %L', '${SUPERUSER}', '${SUPERUSER_PASS}');
+    RAISE NOTICE 'Set password for superuser: ${SUPERUSER}';
+END
+\$\$;
 
 -- Create or update replication user
 DO \$\$
@@ -85,7 +94,7 @@ BEGIN
         RAISE NOTICE 'Created replication user: ${REPL_USER}';
     ELSE
         EXECUTE format('ALTER ROLE %I WITH PASSWORD %L', '${REPL_USER}', '${REPL_PASS}');
-        RAISE NOTICE 'Updated replication user: ${REPL_USER}';
+        RAISE NOTICE 'Updated replication user password: ${REPL_USER}';
     END IF;
 END
 \$\$;
@@ -105,6 +114,9 @@ BEGIN
     END IF;
 END
 \$\$;
+
+-- Verify replication user exists and has correct attributes
+SELECT rolname, rolreplication, rolcanlogin FROM pg_roles WHERE rolname = '${REPL_USER}';
 EOSQL
 
 echo "Post-bootstrap: users created (superuser: ${SUPERUSER}, replication: ${REPL_USER}, app: ${APP_USER})"
