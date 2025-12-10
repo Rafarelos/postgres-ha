@@ -39,11 +39,16 @@ fi
 #   app_user:
 #     username: postgres
 #     password: xxxxx
-REPL_USER=$(grep -A2 'replication:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | sed 's/.*username: *//')
-REPL_PASS=$(grep -A2 'replication:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | sed 's/.*password: *//')
-SUPERUSER=$(grep -A2 'superuser:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | sed 's/.*username: *//')
-APP_USER=$(grep -A2 'app_user:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | sed 's/.*username: *//')
-APP_PASS=$(grep -A2 'app_user:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | sed 's/.*password: *//')
+# Extract value from "key: value" and strip quotes
+strip_yaml() {
+    sed 's/.*: *//' | sed 's/^["'"'"']//' | sed 's/["'"'"']$//'
+}
+
+REPL_USER=$(grep -A2 'replication:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | strip_yaml)
+REPL_PASS=$(grep -A2 'replication:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | strip_yaml)
+SUPERUSER=$(grep -A2 'superuser:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | strip_yaml)
+APP_USER=$(grep -A2 'app_user:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | strip_yaml)
+APP_PASS=$(grep -A2 'app_user:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | strip_yaml)
 
 echo "DEBUG: REPL_USER=${REPL_USER}"
 echo "DEBUG: REPL_PASS length=${#REPL_PASS}"
@@ -56,7 +61,7 @@ if [ -z "$REPL_USER" ] || [ -z "$REPL_PASS" ]; then
 fi
 
 # Extract superuser password too
-SUPERUSER_PASS=$(grep -A2 'superuser:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | sed 's/.*password: *//')
+SUPERUSER_PASS=$(grep -A2 'superuser:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | strip_yaml)
 
 # Patroni passes --username to initdb, so the superuser is whatever is configured
 # (e.g., 'admin' not 'postgres'). Connect as that user.

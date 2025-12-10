@@ -121,15 +121,15 @@ postgresql:
   remove_data_directory_on_diverged_timelines: true
   authentication:
     replication:
-      username: ${REPL_USER}
-      password: ${REPL_PASS}
+      username: "${REPL_USER}"
+      password: "${REPL_PASS}"
     superuser:
-      username: ${SUPERUSER}
-      password: ${SUPERUSER_PASS}
+      username: "${SUPERUSER}"
+      password: "${SUPERUSER_PASS}"
   # Custom section for post_bootstrap to read app user credentials
   app_user:
-    username: ${APP_USER}
-    password: ${APP_PASS}
+    username: "${APP_USER}"
+    password: "${APP_PASS}"
   parameters:
     unix_socket_directories: /var/run/postgresql
 EOF
