@@ -67,6 +67,7 @@ if [ "$HAS_VALID_DATA" = "false" ]; then
         rm -rf "$DATA_DIR"/*
     fi
     mkdir -p "$DATA_DIR"
+    chmod 700 "$DATA_DIR"
 
     # CRITICAL: Check for stale etcd state that would prevent bootstrap
     # If /initialize key exists but no leader, we're stuck - clean it up
@@ -183,6 +184,14 @@ postgresql:
 EOF
 
 echo "Starting Patroni (scope: $SCOPE, etcd: $ETCD_HOSTS)"
+
+# Ensure data directory has correct permissions (PostgreSQL requires 0700)
+mkdir -p "$DATA_DIR"
+chmod 700 "$DATA_DIR"
+
+# Set umask so pg_basebackup creates files with correct permissions
+# Without this, container environments may create files too permissive
+umask 0077
 
 # CRITICAL: Unset PG* environment variables that would override Patroni's pgpass
 # PGPASSWORD takes precedence over pgpass file, causing pg_basebackup to use
