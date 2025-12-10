@@ -36,6 +36,12 @@ echo "DEBUG: REPL_USER=$REPL_USER"
 echo "DEBUG: REPL_PASS length=${#REPL_PASS}"
 echo "DEBUG: REPL_PASS first4=${REPL_PASS:0:4} last4=${REPL_PASS: -4}"
 
+# Debug: Show what Patroni wrote to pgpass (if it exists)
+if [ -f /tmp/pgpass ]; then
+    echo "DEBUG: Patroni pgpass file contents (passwords masked):"
+    sed 's/:[^:]*$/:***MASKED***/' /tmp/pgpass
+fi
+
 # Validate required credentials
 if [ -z "$SUPERUSER" ]; then
     echo "ERROR: Could not extract SUPERUSER from config"
@@ -67,19 +73,26 @@ echo "Replicator user created"
 echo "Verifying password storage..."
 $PSQL -c "SELECT rolname, LEFT(rolpassword, 14) as hash_prefix FROM pg_authid WHERE rolname IN ('$SUPERUSER', '$REPL_USER')"
 
-# 4. CRITICAL TEST: Verify replicator can authenticate via TCP (uses pg_hba rules, not Unix socket trust)
-echo "Testing replicator authentication via TCP..."
+# 4. CRITICAL TEST: Verify replicator can authenticate via TCP
+echo "Testing replicator authentication via TCP (regular connection)..."
 if PGPASSWORD="$REPL_PASS" psql -h 127.0.0.1 -U "$REPL_USER" -d postgres -c "SELECT 1 as auth_test" 2>&1; then
-    echo "SUCCESS: Replicator authentication test PASSED"
+    echo "SUCCESS: Regular connection test PASSED"
 else
-    echo "ERROR: Replicator authentication test FAILED!"
+    echo "ERROR: Regular connection test FAILED!"
+fi
+
+# 5. CRITICAL TEST: Verify replication connection works (this is what pg_basebackup uses)
+echo "Testing replicator authentication via TCP (replication connection)..."
+if PGPASSWORD="$REPL_PASS" psql -h 127.0.0.1 -U "$REPL_USER" -d "dbname=replication replication=database" -c "IDENTIFY_SYSTEM;" 2>&1; then
+    echo "SUCCESS: Replication connection test PASSED"
+else
+    echo "ERROR: Replication connection test FAILED!"
     echo "--- pg_hba.conf ---"
     cat "${PGDATA}/pg_hba.conf" 2>/dev/null || echo "(could not read pg_hba.conf)"
     echo "--- END ---"
-    # Don't exit - let bootstrap complete so we can see full logs
 fi
 
-# 5. Create/update app user if different from superuser
+# 6. Create/update app user if different from superuser
 if [ -n "$APP_USER" ] && [ "$APP_USER" != "$SUPERUSER" ] && [ -n "$APP_PASS" ]; then
     echo "Setting up app user: $APP_USER"
     $PSQL -c "DO \$\$ BEGIN
