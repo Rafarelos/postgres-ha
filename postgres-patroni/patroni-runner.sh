@@ -97,7 +97,8 @@ bootstrap:
     - encoding: UTF8
     - data-checksums
 
-  # Note: users section removed - Patroni 4.0+ requires post_bootstrap script for user creation
+  # Note: bootstrap.users was removed in Patroni 4.0
+  # Users are created in post_bootstrap script instead
 
   pg_hba:
     - local all all trust
