@@ -38,6 +38,9 @@ SUPERUSER="${PATRONI_SUPERUSER_USERNAME:-postgres}"
 SUPERUSER_PASS="${PATRONI_SUPERUSER_PASSWORD}"
 REPL_USER="${PATRONI_REPLICATION_USERNAME:-replicator}"
 REPL_PASS="${PATRONI_REPLICATION_PASSWORD}"
+# App user (standard postgres env vars)
+APP_USER="${POSTGRES_USER:-postgres}"
+APP_PASS="${POSTGRES_PASSWORD}"
 
 echo "Node: $NAME (address: $CONNECT_ADDRESS)"
 
@@ -123,6 +126,10 @@ postgresql:
     superuser:
       username: ${SUPERUSER}
       password: ${SUPERUSER_PASS}
+  # Custom section for post_bootstrap to read app user credentials
+  app_user:
+    username: ${APP_USER}
+    password: ${APP_PASS}
   parameters:
     unix_socket_directories: /var/run/postgresql
 EOF

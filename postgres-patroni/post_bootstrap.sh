@@ -36,9 +36,14 @@ fi
 #     superuser:
 #       username: postgres
 #       password: xxxxx
+#   app_user:
+#     username: postgres
+#     password: xxxxx
 REPL_USER=$(grep -A2 'replication:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | sed 's/.*username: *//')
 REPL_PASS=$(grep -A2 'replication:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | sed 's/.*password: *//')
 SUPERUSER=$(grep -A2 'superuser:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | sed 's/.*username: *//')
+APP_USER=$(grep -A2 'app_user:' "$PATRONI_CONFIG" | grep 'username:' | head -1 | sed 's/.*username: *//')
+APP_PASS=$(grep -A2 'app_user:' "$PATRONI_CONFIG" | grep 'password:' | head -1 | sed 's/.*password: *//')
 
 echo "DEBUG: REPL_USER=${REPL_USER}"
 echo "DEBUG: REPL_PASS length=${#REPL_PASS}"
@@ -93,9 +98,29 @@ BEGIN
     END IF;
 END
 \$\$;
+
+-- Create or update app user (POSTGRES_USER) if different from superuser
+DO \$\$
+BEGIN
+    -- Skip if app_user is same as superuser (already handled above)
+    IF '${APP_USER}' = '${SUPERUSER}' THEN
+        RAISE NOTICE 'App user same as superuser, skipping';
+    ELSIF '${APP_USER}' = 'postgres' THEN
+        -- postgres user exists from initdb, just set password
+        EXECUTE format('ALTER ROLE postgres WITH PASSWORD %L', '${APP_PASS}');
+        RAISE NOTICE 'Set password for postgres user';
+    ELSIF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${APP_USER}') THEN
+        EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L', '${APP_USER}', '${APP_PASS}');
+        RAISE NOTICE 'Created app user: ${APP_USER}';
+    ELSE
+        EXECUTE format('ALTER ROLE %I WITH PASSWORD %L', '${APP_USER}', '${APP_PASS}');
+        RAISE NOTICE 'Updated app user: ${APP_USER}';
+    END IF;
+END
+\$\$;
 EOSQL
 
-echo "Post-bootstrap: users created (superuser: ${SUPERUSER}, replication: ${REPL_USER})"
+echo "Post-bootstrap: users created (superuser: ${SUPERUSER}, replication: ${REPL_USER}, app: ${APP_USER})"
 
 # Generate SSL certificates
 echo "Post-bootstrap: generating SSL certificates..."
