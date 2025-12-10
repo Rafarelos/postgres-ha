@@ -4,7 +4,9 @@
 set -e
 
 # Set up needed variables
-SSL_DIR="/var/lib/postgresql/data/certs"
+# Store certs at volume root so they persist across pgdata rebuilds
+VOLUME_ROOT="${RAILWAY_VOLUME_MOUNT_PATH:-/var/lib/postgresql/data}"
+SSL_DIR="$VOLUME_ROOT/certs"
 
 SSL_SERVER_CRT="$SSL_DIR/server.crt"
 SSL_SERVER_KEY="$SSL_DIR/server.key"

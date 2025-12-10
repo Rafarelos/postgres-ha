@@ -6,8 +6,9 @@
 
 set -e
 
-DATA_DIR="/var/lib/postgresql/data"
-CERTS_DIR="$DATA_DIR/certs"
+DATA_DIR="${PGDATA:-/var/lib/postgresql/data/pgdata}"
+VOLUME_ROOT="${RAILWAY_VOLUME_MOUNT_PATH:-/var/lib/postgresql/data}"
+CERTS_DIR="$VOLUME_ROOT/certs"
 
 echo "=== Patroni Runner ==="
 
@@ -42,7 +43,7 @@ echo "Node: $NAME (address: $CONNECT_ADDRESS)"
 
 # Bootstrap completion marker (like etcd pattern)
 # pg_control can exist from a failed bootstrap - only trust data if marker exists
-BOOTSTRAP_MARKER="$DATA_DIR/.patroni_bootstrap_complete"
+BOOTSTRAP_MARKER="$VOLUME_ROOT/.patroni_bootstrap_complete"
 
 HAS_VALID_DATA=false
 if [ -f "$DATA_DIR/global/pg_control" ] && [ -f "$BOOTSTRAP_MARKER" ]; then
@@ -54,10 +55,13 @@ else
     echo "No PostgreSQL data found"
 fi
 
-# Clean stale/incomplete data (keep certs)
+# Clean stale/incomplete data (keep certs which are at volume root)
 if [ "$HAS_VALID_DATA" = "false" ]; then
-    echo "Cleaning data directory for fresh bootstrap (keeping certs)..."
-    find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name 'certs' -exec rm -rf {} +
+    echo "Cleaning data directory for fresh bootstrap..."
+    if [ -d "$DATA_DIR" ]; then
+        rm -rf "$DATA_DIR"/*
+    fi
+    mkdir -p "$DATA_DIR"
 fi
 
 # Generate Patroni configuration
