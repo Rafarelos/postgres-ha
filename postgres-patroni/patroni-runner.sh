@@ -184,5 +184,11 @@ EOF
 
 echo "Starting Patroni (scope: $SCOPE, etcd: $ETCD_HOSTS)"
 
+# CRITICAL: Unset PG* environment variables that would override Patroni's pgpass
+# PGPASSWORD takes precedence over pgpass file, causing pg_basebackup to use
+# the wrong password (app user's password instead of replicator's)
+# See: https://github.com/patroni/patroni/issues/1489
+unset PGPASSWORD PGUSER PGHOST PGPORT PGDATABASE
+
 # Start Patroni (exec to replace this shell process)
 exec patroni /tmp/patroni.yml
