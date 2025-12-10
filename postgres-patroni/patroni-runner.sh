@@ -97,19 +97,7 @@ bootstrap:
     - encoding: UTF8
     - data-checksums
 
-  users:
-    ${SUPERUSER}:
-      password: ${SUPERUSER_PASS}
-      options:
-        - superuser
-        - createdb
-        - createrole
-        - login
-    ${REPL_USER}:
-      password: ${REPL_PASS}
-      options:
-        - replication
-        - login
+  # Note: users section removed - Patroni 4.0+ requires post_bootstrap script for user creation
 
   pg_hba:
     - local all all trust
