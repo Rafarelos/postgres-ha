@@ -176,9 +176,8 @@ postgresql:
   create_replica_methods:
     - basebackup
   basebackup:
-    max_tries: 3
-    checkpoint: fast
-    wal_method: stream
+    checkpoint: "fast"
+    wal-method: "stream"
   authentication:
     replication:
       username: "${REPL_USER}"
