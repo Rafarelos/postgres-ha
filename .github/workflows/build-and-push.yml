@@ -55,12 +55,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image (slim)
         if: matrix.variant == 'slim'
@@ -73,7 +77,9 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ matrix.postgres_major }}
+            ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ matrix.postgres_major }}-${{ steps.sha.outputs.short }}
             ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ steps.pg_version.outputs.minor_version }}
+            ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ steps.pg_version.outputs.minor_version }}-${{ steps.sha.outputs.short }}
             ${{ matrix.postgres_major == env.LATEST_POSTGRES_MAJOR && format('{0}/postgres-patroni:latest', env.IMAGE_PREFIX) || '' }}
           cache-from: type=gha,scope=pg${{ matrix.postgres_major }}-slim
           cache-to: type=gha,mode=max,scope=pg${{ matrix.postgres_major }}-slim
@@ -89,7 +95,9 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ matrix.postgres_major }}-ha
+            ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ matrix.postgres_major }}-ha-${{ steps.sha.outputs.short }}
             ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ steps.pg_version.outputs.minor_version }}-ha
+            ${{ env.IMAGE_PREFIX }}/postgres-patroni:${{ steps.pg_version.outputs.minor_version }}-ha-${{ steps.sha.outputs.short }}
             ${{ matrix.postgres_major == env.LATEST_POSTGRES_MAJOR && format('{0}/postgres-patroni:latest-ha', env.IMAGE_PREFIX) || '' }}
           cache-from: type=gha,scope=pg${{ matrix.postgres_major }}-ha
           cache-to: type=gha,mode=max,scope=pg${{ matrix.postgres_major }}-ha
@@ -111,12 +119,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and push etcd
         uses: docker/build-push-action@v5
@@ -124,7 +136,9 @@ jobs:
           context: ./etcd
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE_PREFIX }}/etcd:latest
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/etcd:latest
+            ${{ env.IMAGE_PREFIX }}/etcd:${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=etcd
           cache-to: type=gha,mode=max,scope=etcd
 
@@ -144,12 +158,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and push haproxy
         uses: docker/build-push-action@v5
@@ -157,7 +175,9 @@ jobs:
           context: ./haproxy
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE_PREFIX }}/haproxy:latest
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/haproxy:latest
+            ${{ env.IMAGE_PREFIX }}/haproxy:${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=haproxy
           cache-to: type=gha,mode=max,scope=haproxy
 
@@ -177,12 +197,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and push pgbouncer
         uses: docker/build-push-action@v5
@@ -190,7 +214,9 @@ jobs:
           context: ./pgbouncer
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE_PREFIX }}/pgbouncer:latest
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/pgbouncer:latest
+            ${{ env.IMAGE_PREFIX }}/pgbouncer:${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=pgbouncer
           cache-to: type=gha,mode=max,scope=pgbouncer
 
@@ -210,12 +236,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Build and push pgpool
         uses: docker/build-push-action@v5
@@ -223,6 +253,8 @@ jobs:
           context: ./pgpool
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE_PREFIX }}/pgpool:latest
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/pgpool:latest
+            ${{ env.IMAGE_PREFIX }}/pgpool:${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=pgpool
           cache-to: type=gha,mode=max,scope=pgpool
