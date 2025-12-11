@@ -18,7 +18,7 @@ PEER_WAIT_TIMEOUT=${ETCD_PEER_WAIT_TIMEOUT:-300}
 PEER_CHECK_INTERVAL=${ETCD_PEER_CHECK_INTERVAL:-5}
 
 log() {
-  echo "[$(date -Iseconds)] ENTRYPOINT: $1"
+  echo "[$(date -Iseconds)] ENTRYPOINT: $1" >&2
 }
 
 check_cluster_health() {
@@ -98,6 +98,7 @@ wait_for_leader() {
 }
 
 # Add this node to an existing cluster
+# On success, outputs the ETCD_INITIAL_CLUSTER value to use
 add_self_to_cluster() {
   leader=$1
   endpoint=$(get_leader_endpoint "$leader")
@@ -108,15 +109,30 @@ add_self_to_cluster() {
   # Check if already a member (in case of restart)
   if etcdctl member list --endpoints="$endpoint" 2>/dev/null | grep -q "$ETCD_NAME"; then
     log "Already a member of the cluster"
+    # Build cluster string from member list for existing member
+    get_current_cluster "$leader"
     return 0
   fi
 
-  # Add as new member
-  if etcdctl member add "$ETCD_NAME" --peer-urls="$my_peer_url" --endpoints="$endpoint"; then
+  # Add as new member and capture output (contains ETCD_INITIAL_CLUSTER)
+  output=$(etcdctl member add "$ETCD_NAME" --peer-urls="$my_peer_url" --endpoints="$endpoint" 2>&1)
+  result=$?
+
+  if [ $result -eq 0 ]; then
     log "Successfully added to cluster"
+    # Extract ETCD_INITIAL_CLUSTER from member add output
+    # Output format: ETCD_INITIAL_CLUSTER="name1=url1,name2=url2"
+    cluster=$(echo "$output" | grep 'ETCD_INITIAL_CLUSTER=' | head -1 | sed 's/.*ETCD_INITIAL_CLUSTER="//' | sed 's/"$//')
+    if [ -n "$cluster" ]; then
+      echo "$cluster"
+    else
+      # Fallback to building from member list
+      log "Could not extract cluster from member add output, using member list"
+      get_current_cluster "$leader"
+    fi
     return 0
   else
-    log "Failed to add self to cluster"
+    log "Failed to add self to cluster: $output"
     return 1
   fi
 }
@@ -214,7 +230,9 @@ while [ $attempt -le $MAX_RETRIES ]; do
         continue
       fi
 
-      if ! add_self_to_cluster "$BOOTSTRAP_LEADER"; then
+      # add_self_to_cluster outputs the ETCD_INITIAL_CLUSTER value on success
+      CURRENT_CLUSTER=$(add_self_to_cluster "$BOOTSTRAP_LEADER")
+      if [ $? -ne 0 ] || [ -z "$CURRENT_CLUSTER" ]; then
         log "Failed to add self to cluster, retrying..."
         kill $MONITOR_PID 2>/dev/null || true
         attempt=$((attempt + 1))
@@ -222,8 +240,6 @@ while [ $attempt -le $MAX_RETRIES ]; do
         continue
       fi
 
-      # Get current cluster membership and join as existing
-      CURRENT_CLUSTER=$(get_current_cluster "$BOOTSTRAP_LEADER")
       log "Joining existing cluster: $CURRENT_CLUSTER"
 
       export ETCD_INITIAL_CLUSTER="$CURRENT_CLUSTER"
