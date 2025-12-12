@@ -86,7 +86,8 @@ frontend postgresql_primary
     default_backend postgresql_primary_backend
 
 backend postgresql_primary_backend
-    option httpchk GET /primary
+    option httpchk
+    http-check send meth GET uri /primary
     http-check expect status 200
     default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions
 ${PRIMARY_SERVERS}
@@ -98,7 +99,8 @@ frontend postgresql_replicas
 
 backend postgresql_replicas_backend
     balance roundrobin
-    option httpchk GET /replica
+    option httpchk
+    http-check send meth GET uri /replica
     http-check expect status 200
     default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions
 ${REPLICA_SERVERS}
