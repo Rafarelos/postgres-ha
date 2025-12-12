@@ -10,7 +10,7 @@
 # 2. Leader bootstraps single-node cluster (instant quorum)
 # 3. Other nodes wait for leader, add themselves, then join existing cluster
 
-DATA_DIR=${ETCD_DATA_DIR:-/etcd-data}
+DATA_DIR=${ETCD_DATA_DIR:-/var/lib/etcd}
 MAX_RETRIES=${ETCD_MAX_RETRIES:-60}
 RETRY_DELAY=${ETCD_RETRY_DELAY:-5}
 BOOTSTRAP_COMPLETE_MARKER="$DATA_DIR/.bootstrap_complete"

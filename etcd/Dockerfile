@@ -26,9 +26,9 @@ COPY --from=tools /lib/libc.musl-*.so.1 /lib/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-RUN mkdir -p /etcd-data && chmod 700 /etcd-data
+RUN mkdir -p /var/lib/etcd && chmod 700 /var/lib/etcd
 
-ENV ETCD_DATA_DIR=/etcd-data
+ENV ETCD_DATA_DIR=/var/lib/etcd
 # Enable gRPC gateway for Patroni etcd3 client compatibility
 ENV ETCD_ENABLE_GRPC_GATEWAY=true
 # Retry settings (5 min total with defaults: 60 retries * 5s delay)

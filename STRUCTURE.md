@@ -26,7 +26,7 @@ postgres-ha/
 │   └── get-postgres-version.sh        # Fetches latest minor version from Docker Hub
 │
 ├── etcd/                              # etcd distributed consensus
-│   ├── Dockerfile                     # etcd v3.5.16 image
+│   ├── Dockerfile                     # etcd v3.6.6 image
 │   ├── entrypoint.sh                  # Smart bootstrap with leader election
 │   └── railway.toml                   # Railway service config
 │
@@ -180,6 +180,6 @@ ghcr.io/<owner>/postgres-ha/postgres-patroni:16
 ghcr.io/<owner>/postgres-ha/postgres-patroni:15
 ghcr.io/<owner>/postgres-ha/postgres-patroni:14
 ghcr.io/<owner>/postgres-ha/postgres-patroni:13
-ghcr.io/<owner>/postgres-ha/etcd:3.5.16
+ghcr.io/<owner>/postgres-ha/etcd:3.6.6
 ghcr.io/<owner>/postgres-ha/haproxy:3.2
 ```
