@@ -284,8 +284,8 @@ is_learner() {
 # Learners can't handle most RPCs, so we need a voting member
 get_voting_member_endpoint() {
   # Try each peer from initial cluster config
-  echo "$ETCD_INITIAL_CLUSTER" | tr ',' '\n' | while read -r entry; do
-    peer_name=$(echo "$entry" | cut -d'=' -f1)
+  # Note: Can't use pipe to while loop as it creates subshell, breaking return
+  for entry in $(echo "$ETCD_INITIAL_CLUSTER" | tr ',' ' '); do
     peer_url=$(echo "$entry" | cut -d'=' -f2)
     client_endpoint=$(echo "$peer_url" | sed 's/:2380/:2379/')
 
