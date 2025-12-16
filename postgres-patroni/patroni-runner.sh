@@ -51,7 +51,14 @@ echo "Node: $NAME (address: $CONNECT_ADDRESS)"
 BOOTSTRAP_MARKER="$VOLUME_ROOT/.patroni_bootstrap_complete"
 
 HAS_VALID_DATA=false
-if [ -f "$DATA_DIR/global/pg_control" ] && [ -f "$BOOTSTRAP_MARKER" ]; then
+
+# Check if we're migrating from vanilla postgres (set by Railway HA conversion)
+if [ "${PATRONI_ADOPT_EXISTING_DATA}" = "true" ] && [ -f "$DATA_DIR/global/pg_control" ] && [ ! -f "$BOOTSTRAP_MARKER" ]; then
+    echo "PATRONI_ADOPT_EXISTING_DATA=true - migrating from vanilla PostgreSQL"
+    echo "Preserving existing data and adopting into Patroni cluster"
+    HAS_VALID_DATA=true
+    touch "$BOOTSTRAP_MARKER"
+elif [ -f "$DATA_DIR/global/pg_control" ] && [ -f "$BOOTSTRAP_MARKER" ]; then
     HAS_VALID_DATA=true
     echo "Found valid data with bootstrap marker"
 elif [ -f "$DATA_DIR/global/pg_control" ]; then
