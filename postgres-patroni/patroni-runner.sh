@@ -150,6 +150,8 @@ postgresql:
   connect_address: ${CONNECT_ADDRESS}:5432
   data_dir: ${DATA_DIR}
   pgpass: /tmp/pgpass
+  callbacks:
+    on_role_change: /on_role_change.sh
   remove_data_directory_on_rewind_failure: true
   remove_data_directory_on_diverged_timelines: true
   create_replica_methods:
@@ -171,6 +173,10 @@ postgresql:
     database: "${APP_DB}"
   parameters:
     unix_socket_directories: /var/run/postgresql
+    ssl: "on"
+    ssl_cert_file: "${CERTS_DIR}/server.crt"
+    ssl_key_file: "${CERTS_DIR}/server.key"
+    ssl_ca_file: "${CERTS_DIR}/root.crt"
 EOF
 
 echo "Starting Patroni (scope: $SCOPE, etcd: $ETCD_HOSTS)"
