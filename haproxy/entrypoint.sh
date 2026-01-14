@@ -94,7 +94,7 @@ resolvers railway
 
 # Stats page for monitoring
 listen stats
-    bind *:8404
+    bind :::8404 v4v6
     mode http
     stats enable
     stats uri /stats
@@ -102,7 +102,7 @@ listen stats
 
 # Primary PostgreSQL (read-write)
 frontend postgresql_primary
-    bind *:5432
+    bind :::5432 v4v6
     default_backend postgresql_primary_backend
 
 backend postgresql_primary_backend
@@ -129,7 +129,7 @@ cat >> "$CONFIG_FILE" << EOF
 
 # Replica PostgreSQL (read-only)
 frontend postgresql_replicas
-    bind *:5433
+    bind :::5432 v4v6
     default_backend postgresql_replicas_backend
 
 backend postgresql_replicas_backend
