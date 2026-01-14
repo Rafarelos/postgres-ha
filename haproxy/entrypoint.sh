@@ -54,10 +54,10 @@ generate_servers() {
 
         if [ "$SINGLE_NODE_MODE" = "true" ]; then
             # Single node: skip Patroni health check, use TCP check on PostgreSQL port
-            echo "    server ${name} ${host}:${pgport} check resolvers railway resolve-prefer ipv4"
+            echo "    server ${name} ${host}:${pgport} check resolvers railway resolve-prefer ipv6"
         else
             # Multi-node: use Patroni health check
-            echo "    server ${name} ${host}:${pgport} check port ${patroniport} resolvers railway resolve-prefer ipv4"
+            echo "    server ${name} ${host}:${pgport} check port ${patroniport} resolvers railway resolve-prefer ipv6"
         fi
     done
 }
