@@ -129,7 +129,7 @@ cat >> "$CONFIG_FILE" << EOF
 
 # Replica PostgreSQL (read-only)
 frontend postgresql_replicas
-    bind :::5432 v4v6
+    bind :::5433 v4v6
     default_backend postgresql_replicas_backend
 
 backend postgresql_replicas_backend
