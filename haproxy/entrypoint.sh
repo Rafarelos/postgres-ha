@@ -11,12 +11,13 @@ if [ -z "${POSTGRES_NODES}" ]; then
     exit 1
 fi
 
-# Optional with defaults
+# Optional with defaults - OTIMIZADO PARA RESPOSTA RÁPIDA
 HAPROXY_MAX_CONN="${HAPROXY_MAX_CONN:-1000}"
-HAPROXY_TIMEOUT_CONNECT="${HAPROXY_TIMEOUT_CONNECT:-10s}"
-HAPROXY_TIMEOUT_CLIENT="${HAPROXY_TIMEOUT_CLIENT:-30m}"
-HAPROXY_TIMEOUT_SERVER="${HAPROXY_TIMEOUT_SERVER:-30m}"
-HAPROXY_CHECK_INTERVAL="${HAPROXY_CHECK_INTERVAL:-3s}"
+HAPROXY_TIMEOUT_CONNECT="${HAPROXY_TIMEOUT_CONNECT:-3s}"      # Reduzido: fail-fast na conexão
+HAPROXY_TIMEOUT_CLIENT="${HAPROXY_TIMEOUT_CLIENT:-60s}"       # Reduzido: evita conexões zumbis
+HAPROXY_TIMEOUT_SERVER="${HAPROXY_TIMEOUT_SERVER:-60s}"       # Reduzido: queries devem retornar em 60s
+HAPROXY_TIMEOUT_QUEUE="${HAPROXY_TIMEOUT_QUEUE:-5s}"          # NOVO: máximo 5s na fila de espera
+HAPROXY_CHECK_INTERVAL="${HAPROXY_CHECK_INTERVAL:-1s}"        # Reduzido: detecta problemas mais rápido
 
 # Count nodes
 count_nodes() {
@@ -77,23 +78,25 @@ defaults
     option tcpka                     # Mantém a conexão viva
     option clitcpka                  # Keep-alive no lado do cliente (Backend)
     option srvtcpka                  # Keep-alive no lado do servidor (Postgres)
-    retries 3                        
+    option redispatch                # NOVO: reconecta em outro servidor se falhar
+    retries 1                        # Reduzido: falha rápida, não fica tentando
     timeout connect ${HAPROXY_TIMEOUT_CONNECT}
     timeout client ${HAPROXY_TIMEOUT_CLIENT}
     timeout server ${HAPROXY_TIMEOUT_SERVER}
-    timeout check 3s                 # Checagem de saúde mais ágil
+    timeout queue ${HAPROXY_TIMEOUT_QUEUE}
+    timeout check 2s                 # Checagem de saúde mais ágil
 
 resolvers railway
     parse-resolv-conf
-    resolve_retries 3
-    timeout resolve 1s
-    timeout retry   1s
-    hold other      10s
-    hold refused    10s
-    hold nx         10s
-    hold timeout    10s
-    hold valid      10s
-    hold obsolete   10s
+    resolve_retries 2                # Reduzido: falha rápida no DNS
+    timeout resolve 500ms            # Reduzido: DNS deve responder rápido
+    timeout retry   500ms            # Reduzido: retry rápido
+    hold other      5s               # Reduzido: atualiza cache mais rápido
+    hold refused    5s
+    hold nx         5s
+    hold timeout    5s
+    hold valid      5s
+    hold obsolete   5s
 
 # Stats page for monitoring
 listen stats
@@ -114,7 +117,7 @@ EOF
 if [ "$SINGLE_NODE_MODE" = "true" ]; then
     # Single node: simple TCP check, no Patroni health check
     cat >> "$CONFIG_FILE" << EOF
-    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions
+    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 2 rise 1 fastinter 500ms downinter 500ms on-marked-down shutdown-sessions
 ${PRIMARY_SERVERS}
 EOF
 else
@@ -124,7 +127,7 @@ else
     option httpchk
     http-check send meth GET uri /primary
     http-check expect status 200
-    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions
+    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 2 rise 1 fastinter 500ms downinter 500ms on-marked-down shutdown-sessions
 ${PRIMARY_SERVERS}
 EOF
 fi
@@ -143,7 +146,7 @@ EOF
 if [ "$SINGLE_NODE_MODE" = "true" ]; then
     # Single node: simple TCP check, no Patroni health check
     cat >> "$CONFIG_FILE" << EOF
-    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions
+    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 2 rise 1 fastinter 500ms downinter 500ms on-marked-down shutdown-sessions
 ${REPLICA_SERVERS}
 EOF
 else
@@ -152,7 +155,7 @@ else
     option httpchk
     http-check send meth GET uri /replica
     http-check expect status 200
-    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 3 rise 2 on-marked-down shutdown-sessions
+    default-server inter ${HAPROXY_CHECK_INTERVAL} fall 2 rise 1 fastinter 500ms downinter 500ms on-marked-down shutdown-sessions
 ${REPLICA_SERVERS}
 EOF
 fi
