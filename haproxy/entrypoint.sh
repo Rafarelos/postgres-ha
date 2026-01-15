@@ -74,11 +74,14 @@ global
 defaults
     log global
     mode tcp
-    retries 3
+    option tcpka                     # Mantém a conexão viva
+    option clitcpka                  # Keep-alive no lado do cliente (Backend)
+    option srvtcpka                  # Keep-alive no lado do servidor (Postgres)
+    retries 3                        
     timeout connect ${HAPROXY_TIMEOUT_CONNECT}
     timeout client ${HAPROXY_TIMEOUT_CLIENT}
     timeout server ${HAPROXY_TIMEOUT_SERVER}
-    timeout check 5s
+    timeout check 3s                 # Checagem de saúde mais ágil
 
 resolvers railway
     parse-resolv-conf
@@ -117,6 +120,7 @@ EOF
 else
     # Multi-node: use Patroni HTTP health checks
     cat >> "$CONFIG_FILE" << EOF
+    balance leastconn                # Distribui para quem está mais livre
     option httpchk
     http-check send meth GET uri /primary
     http-check expect status 200
@@ -133,7 +137,7 @@ frontend postgresql_replicas
     default_backend postgresql_replicas_backend
 
 backend postgresql_replicas_backend
-    balance roundrobin
+    balance leastconn                # Distribui para quem está mais livre
 EOF
 
 if [ "$SINGLE_NODE_MODE" = "true" ]; then
